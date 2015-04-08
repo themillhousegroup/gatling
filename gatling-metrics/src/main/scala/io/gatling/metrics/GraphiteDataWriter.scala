@@ -95,9 +95,9 @@ private[gatling] class GraphiteDataWriter extends DataWriter[GraphiteData] {
     import response._
     if (!configuration.data.graphite.light) {
       val path = graphitePath(groupHierarchy :+ name)
-      requestsByPath.getOrElseUpdate(path, newRequestMetricsBuffer(configuration)).add(status, timings.responseTime)
+      requestsByPath.getOrElseUpdate(path, newRequestMetricsBuffer(configuration)).add(status, timings.responseTime, response.responseCode)
     }
-    requestsByPath.getOrElseUpdate(AllRequestsKey, newRequestMetricsBuffer(configuration)).add(status, timings.responseTime)
+    requestsByPath.getOrElseUpdate(AllRequestsKey, newRequestMetricsBuffer(configuration)).add(status, timings.responseTime, response.responseCode)
   }
 
   override def onMessage(message: LoadEventMessage, data: GraphiteData): Unit = message match {
@@ -128,6 +128,10 @@ private[gatling] class GraphiteDataWriter extends DataWriter[GraphiteData] {
     sendMetrics(data, metricPath / "ok", metricByStatus.ok, epoch)
     sendMetrics(data, metricPath / "ko", metricByStatus.ko, epoch)
     sendMetrics(data, metricPath / "all", metricByStatus.all, epoch)
+    metricByStatus.statusCodes.foreach {
+      case (statusCode, count) =>
+        sendToGraphite(data, metricPath / "code" / statusCode.getOrElse("undefined"), count, epoch)
+    }
   }
 
   private def sendUserMetrics(data: GraphiteData, userMetricPath: GraphitePath, userMetric: UsersBreakdown, epoch: Long): Unit = {

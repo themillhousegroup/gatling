@@ -20,7 +20,7 @@ import io.gatling.core.result.message.{ KO, OK, Status }
 import com.tdunning.math.stats.{ AVLTreeDigest, TDigest }
 
 private[metrics] trait RequestMetricsBuffer {
-  def add(status: Status, time: Long): Unit
+  def add(status: Status, time: Long, statusCode: Option[String]): Unit
   def clear(): Unit
   def metricsByStatus: MetricByStatus
 }
@@ -35,9 +35,12 @@ private[metrics] class TDigestRequestMetricsBuffer(configuration: GatlingConfigu
   private var okDigest: TDigest = _
   private var koDigest: TDigest = _
   private var allDigest: TDigest = _
+
+  private var statusCodes: Map[Option[String], Int] = _
+
   clear()
 
-  override def add(status: Status, time: Long): Unit = {
+  override def add(status: Status, time: Long, statusCode: Option[String]): Unit = {
     val responseTime = time.max(0L)
 
     allDigest.add(responseTime)
@@ -45,16 +48,19 @@ private[metrics] class TDigestRequestMetricsBuffer(configuration: GatlingConfigu
       case OK => okDigest.add(responseTime)
       case KO => koDigest.add(responseTime)
     }
+
+    statusCodes = statusCodes + (statusCode -> (statusCodes(statusCode) + 1))
   }
 
   override def clear(): Unit = {
     okDigest = new AVLTreeDigest(100.0)
     koDigest = new AVLTreeDigest(100.0)
     allDigest = new AVLTreeDigest(100.0)
+    statusCodes = Map.empty[Option[String], Int].withDefault(_ => 0)
   }
 
   override def metricsByStatus: MetricByStatus =
-    MetricByStatus(metricsOfDigest(okDigest), metricsOfDigest(koDigest), metricsOfDigest(allDigest))
+    MetricByStatus(metricsOfDigest(okDigest), metricsOfDigest(koDigest), metricsOfDigest(allDigest), statusCodes)
 
   private def metricsOfDigest(digest: TDigest): Option[Metrics] = {
     val count = digest.size
@@ -69,5 +75,5 @@ private[metrics] class TDigestRequestMetricsBuffer(configuration: GatlingConfigu
   }
 }
 
-private[metrics] case class MetricByStatus(ok: Option[Metrics], ko: Option[Metrics], all: Option[Metrics])
+private[metrics] case class MetricByStatus(ok: Option[Metrics], ko: Option[Metrics], all: Option[Metrics], statusCodes: Map[Option[String], Int])
 private[metrics] case class Metrics(count: Long, min: Int, max: Int, percentile1: Int, percentile2: Int, percentile3: Int, percentile4: Int)

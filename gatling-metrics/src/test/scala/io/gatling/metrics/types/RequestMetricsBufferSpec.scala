@@ -38,12 +38,11 @@ class RequestMetricsBufferSpec extends BaseSpec {
     metricsByStatus.ok shouldBe None
     metricsByStatus.ko shouldBe None
     metricsByStatus.all shouldBe None
-
   }
 
   it should "work when there is one OK mesure" in {
     val buff = new TDigestRequestMetricsBuffer(configuration)
-    buff.add(OK, 20)
+    buff.add(OK, 20, Some("200"))
 
     val metricsByStatus = buff.metricsByStatus
     val okMetrics = metricsByStatus.ok.get
@@ -52,12 +51,15 @@ class RequestMetricsBufferSpec extends BaseSpec {
     metricsByStatus.all.map(_.count) shouldBe Some(1l)
     okMetrics.count shouldBe 1L
     all(allValues(okMetrics)) shouldBe 20
+    metricsByStatus.statusCodes.size shouldBe 1
+    metricsByStatus.statusCodes(Some("200")) shouldBe 1
   }
 
   it should "work when there are multiple measures" in {
     val buff = new TDigestRequestMetricsBuffer(configuration)
-    buff.add(KO, 10)
-    for (t <- 100 to 200) buff.add(OK, t)
+    buff.add(KO, 10, Some("200"))
+    val count = 100
+    for (t <- 0 until count) buff.add(OK, 100 + t, Some("200"))
 
     val metricsByStatus = buff.metricsByStatus
     val okMetrics = metricsByStatus.ok.get
@@ -66,17 +68,20 @@ class RequestMetricsBufferSpec extends BaseSpec {
 
     koMetrics.count shouldBe 1
     all(allValues(koMetrics)) shouldBe 10
-    allMetrics.count shouldBe 102L
-    okMetrics.count shouldBe 101L
+    allMetrics.count shouldBe 101L
+    okMetrics.count shouldBe 100L
     okMetrics.min shouldBe 100
-    okMetrics.max shouldBe 200
-    okMetrics.percentile1 shouldBe 195
-    okMetrics.percentile2 shouldBe 199
+    okMetrics.max shouldBe 199
+    okMetrics.percentile1 shouldBe 194
+    okMetrics.percentile2 shouldBe 198
+    metricsByStatus.statusCodes.size shouldBe 1
+    metricsByStatus.statusCodes(Some("200")) shouldBe count + 1
   }
 
   it should "work when there are a large number of measures" in {
     val buff = new TDigestRequestMetricsBuffer(configuration)
-    for (t <- 1 to 10000) buff.add(OK, t)
+    val count = 10000
+    for (t <- 1 to count) buff.add(OK, t, Some("200"))
 
     val metricsByStatus = buff.metricsByStatus
     val okMetrics = metricsByStatus.ok.get
@@ -86,5 +91,7 @@ class RequestMetricsBufferSpec extends BaseSpec {
     okMetrics.max shouldBe 10000
     okMetrics.percentile1 shouldBe 9500
     okMetrics.percentile2 shouldBe 9900
+    metricsByStatus.statusCodes.size shouldBe 1
+    metricsByStatus.statusCodes(Some("200")) shouldBe count
   }
 }
