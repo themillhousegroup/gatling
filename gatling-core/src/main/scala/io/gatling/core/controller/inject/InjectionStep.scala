@@ -64,13 +64,29 @@ case class NothingForInjection(duration: FiniteDuration) extends InjectionStep {
 }
 
 /**
- * Injection all the users at once
+ * Inject all the users at once
  */
 case class AtOnceInjection(users: Int) extends InjectionStep {
   require(users > 0, "The number of users must be a strictly positive value")
 
   override def chain(chained: Iterator[FiniteDuration]): Iterator[FiniteDuration] =
     Iterator.continually(0 milliseconds).take(users) ++ chained
+}
+
+/**
+ * Inject a number of users at once, where the number of users may change per-injection.
+ * Supply a function that takes the "old" number-of-users and returns a new number.
+ * example: AtOnceDynamicInjection(10, _ + 1) // increments the number of users each time.
+ */
+case class AtOnceDynamicInjection(users: Int, changeFn: Int => Int) extends InjectionStep {
+  require(users > 0, "The number of users must be a strictly positive value")
+  var oldCount = users
+
+  override def chain(chained: Iterator[FiniteDuration]): Iterator[FiniteDuration] = {
+    val currentCount = oldCount
+    oldCount = changeFn(oldCount)
+    Iterator.continually(0 milliseconds).take(currentCount) ++ chained
+  }
 }
 
 /**
