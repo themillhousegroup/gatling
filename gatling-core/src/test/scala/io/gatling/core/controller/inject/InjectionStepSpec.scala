@@ -161,7 +161,7 @@ class InjectionStepSpec extends BaseSpec {
     l shouldBe 67 // two thirds
   }
 
-  "Injection chaining" should "provide a monotonically increasing serie of duration" in {
+  "Injection chaining" should "provide a monotonically increasing series of duration" in {
     val scheduling = RampInjection(3, 2 seconds).chain(RampInjection(3, 2 seconds).chain(Iterator.empty)).toVector
     scheduling shouldBe sorted
   }
@@ -188,6 +188,20 @@ class InjectionStepSpec extends BaseSpec {
     scheduling(scheduling.size - 2).toMillis shouldBe 60000L +- 5L
     scheduling.head.toMillis shouldBe 0L +- 200L
     scheduling(7500).toMillis shouldBe 30000L +- 1000L // Half-way through ramp-up we should have run a quarter of users
+  }
+
+  "Dynamic injection control" should "allow simple incrementing of users" in {
+    val initialUserCount = 5
+    val dynamicIncrement = AtOnceDynamicInjection(initialUserCount, _ + 1)
+    val scheduling = dynamicIncrement.chain(Iterator(0.seconds)).toVector
+    scheduling.size shouldBe (initialUserCount + 1)
+  }
+
+  it should "allow more-complex incrementing of users" in {
+    val initialUserCount = 5
+    val dynIncrement = AtOnceDynamicInjection(initialUserCount, x => x * 2)
+    val scheduling = dynIncrement.chain(Iterator(0.seconds)).toVector
+    scheduling.size shouldBe (initialUserCount + initialUserCount)
   }
 
 }
