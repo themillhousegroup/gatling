@@ -192,16 +192,47 @@ class InjectionStepSpec extends BaseSpec {
 
   "Dynamic injection control" should "allow simple incrementing of users" in {
     val initialUserCount = 5
-    val dynamicIncrement = AtOnceDynamicInjection(initialUserCount, _ + 1)
-    val scheduling = dynamicIncrement.chain(Iterator(0.seconds)).toVector
+    val dynIncrement = AtOnceDynamicInjection(initialUserCount, _ + 1)
+    val scheduling = dynIncrement.chain(Iterator(0.seconds)).toVector
     scheduling.size shouldBe (initialUserCount + 1)
+    dynIncrement.users shouldBe (initialUserCount)
+    dynIncrement.oldCount shouldBe (initialUserCount + 1)
   }
 
   it should "allow more-complex incrementing of users" in {
     val initialUserCount = 5
-    val dynIncrement = AtOnceDynamicInjection(initialUserCount, x => x * 2)
+    val dynIncrement = AtOnceDynamicInjection(initialUserCount, x => (x * 3))
     val scheduling = dynIncrement.chain(Iterator(0.seconds)).toVector
-    scheduling.size shouldBe (initialUserCount + initialUserCount)
+    scheduling.size shouldBe (initialUserCount + 1)
+    dynIncrement.users shouldBe (initialUserCount)
+    dynIncrement.oldCount shouldBe (initialUserCount * 3)
+  }
+
+  it should "allow more-complex shaping of users" in {
+    val initialUserCount = 8
+    val dynIncrement = AtOnceDynamicInjection(initialUserCount, x => if (x < 30) (x / 2 * 3) else (x / 2))
+    val scheduling = dynIncrement.chain(Iterator(0.seconds)).toVector
+    scheduling.size shouldBe (initialUserCount + 1)
+    dynIncrement.users shouldBe (initialUserCount)
+    dynIncrement.oldCount shouldBe (12)
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (18)
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (27)
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (39)
+    // Now it starts to oscillate as we've exceeded 30
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (19)
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (27)
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (39)
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (19)
+    dynIncrement.chain(Iterator(0.seconds))
+    dynIncrement.oldCount shouldBe (27)
+
   }
 
 }
